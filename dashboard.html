@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>URL Queue Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;600;800&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0d0d0f;
+      --surface: #141416;
+      --card: #1a1a1e;
+      --border: #2a2a30;
+      --rose: #ff4f7b;
+      --rose-dim: #ff4f7b22;
+      --rose-mid: #ff4f7b66;
+      --cyan: #00e5cc;
+      --cyan-dim: #00e5cc18;
+      --text: #f0eff4;
+      --muted: #6b6a75;
+      --tag: #252530;
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'DM Mono', monospace;
+      overflow: hidden;
+    }
+
+    /* Subtle grid background */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(255,79,123,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,79,123,0.03) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .shell {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      max-width: 780px;
+      margin: 0 auto;
+      padding: 24px 20px 20px;
+    }
+
+    /* Header */
+    .header {
+      display: flex;
+      align-items: baseline;
+      gap: 14px;
+      margin-bottom: 28px;
+    }
+    .header h1 {
+      font-family: 'Syne', sans-serif;
+      font-weight: 800;
+      font-size: 1.5rem;
+      letter-spacing: -0.02em;
+      color: var(--text);
+    }
+    .header .dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--rose);
+      box-shadow: 0 0 10px var(--rose);
+      flex-shrink: 0;
+      align-self: center;
+      animation: pulse 2s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(0.7); }
+    }
+
+    /* Tab Nav */
+    .tabs {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 24px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 4px;
+    }
+    .tab-btn {
+      flex: 1;
+      background: none;
+      border: none;
+      color: var(--muted);
+      font-family: 'DM Mono', monospace;
+      font-size: 0.75rem;
+      font-weight: 500;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 10px 16px;
+      border-radius: 7px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    .tab-btn:hover { color: var(--text); }
+    .tab-btn.active {
+      background: var(--card);
+      color: var(--rose);
+      border: 1px solid var(--rose-mid);
+      box-shadow: 0 0 16px var(--rose-dim);
+    }
+    .tab-btn .badge {
+      background: var(--rose);
+      color: #fff;
+      font-size: 0.6rem;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 10px;
+      min-width: 18px;
+      text-align: center;
+      display: none;
+    }
+    .tab-btn .badge.show { display: inline-block; }
+
+    /* Pages */
+    .page { display: none; flex-direction: column; flex: 1; overflow: hidden; }
+    .page.active { display: flex; }
+
+    /* ── PAGE 1: Input ── */
+    .input-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 28px;
+      flex-shrink: 0;
+      transition: border-color 0.3s ease, box-shadow 0.3s ease;
+    }
+    .input-card.ready {
+      border-color: var(--rose-mid);
+      box-shadow: 0 0 30px var(--rose-dim);
+    }
+
+    .field {
+      margin-bottom: 16px;
+    }
+    .field label {
+      display: block;
+      font-size: 0.65rem;
+      font-weight: 500;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+    .field input, .field textarea {
+      width: 100%;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-family: 'DM Mono', monospace;
+      font-size: 0.85rem;
+      padding: 12px 14px;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      resize: none;
+    }
+    .field input::placeholder, .field textarea::placeholder { color: var(--muted); }
+    .field input:focus, .field textarea:focus {
+      border-color: var(--rose-mid);
+      box-shadow: 0 0 0 3px var(--rose-dim);
+    }
+
+    .enter-btn {
+      width: 100%;
+      margin-top: 6px;
+      background: var(--rose);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-family: 'Syne', sans-serif;
+      font-weight: 700;
+      font-size: 0.85rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 14px;
+      cursor: pointer;
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(6px);
+      transition: opacity 0.25s ease, transform 0.25s ease, background 0.15s;
+    }
+    .enter-btn.visible {
+      opacity: 1;
+      pointer-events: all;
+      transform: translateY(0);
+    }
+    .enter-btn:hover { background: #ff2a5e; }
+    .enter-btn:active { transform: scale(0.98); }
+
+    /* Saved list on page 1 */
+    .saved-header {
+      font-size: 0.65rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin: 24px 0 12px;
+      padding-left: 2px;
+    }
+    .saved-list { overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 8px; }
+
+    .saved-item {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      animation: slideIn 0.3s ease;
+    }
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(-8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .saved-item .item-index {
+      font-size: 0.65rem;
+      color: var(--muted);
+      flex-shrink: 0;
+      width: 20px;
+    }
+    .saved-item .item-url {
+      font-size: 0.78rem;
+      color: var(--rose);
+      flex: 1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .saved-item .item-comment {
+      font-size: 0.75rem;
+      color: var(--muted);
+      max-width: 200px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* ── PAGE 2: Queue ── */
+    .queue-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .empty-state {
+      text-align: center;
+      color: var(--muted);
+    }
+    .empty-state .empty-icon {
+      font-size: 2.5rem;
+      margin-bottom: 12px;
+      opacity: 0.3;
+    }
+    .empty-state p {
+      font-size: 0.8rem;
+      line-height: 1.6;
+    }
+
+    .queue-card {
+      width: 100%;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 32px;
+      position: relative;
+      overflow: hidden;
+      animation: cardIn 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    @keyframes cardIn {
+      from { opacity: 0; transform: translateY(20px) scale(0.97); }
+      to   { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    .queue-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, var(--rose), var(--cyan));
+    }
+
+    .q-counter {
+      font-size: 0.65rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 20px;
+    }
+    .q-counter span { color: var(--rose); }
+
+    .q-url {
+      font-family: 'Syne', sans-serif;
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--rose);
+      word-break: break-all;
+      margin-bottom: 14px;
+      line-height: 1.4;
+    }
+
+    .q-comment-label {
+      font-size: 0.62rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+    .q-comment {
+      font-size: 0.85rem;
+      color: var(--text);
+      line-height: 1.6;
+      padding: 12px 14px;
+      background: var(--surface);
+      border-radius: 8px;
+      border-left: 2px solid var(--rose-mid);
+      margin-bottom: 28px;
+    }
+
+    .q-actions {
+      display: flex;
+      gap: 12px;
+    }
+
+    .btn-copy, .btn-goto {
+      flex: 1;
+      padding: 13px;
+      border-radius: 8px;
+      font-family: 'DM Mono', monospace;
+      font-size: 0.75rem;
+      font-weight: 500;
+      letter-spacing: 0.05em;
+      cursor: pointer;
+      border: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: all 0.2s ease;
+    }
+    .btn-copy {
+      background: var(--cyan-dim);
+      color: var(--cyan);
+      border: 1px solid #00e5cc44;
+    }
+    .btn-copy:hover { background: #00e5cc28; box-shadow: 0 0 16px #00e5cc22; }
+    .btn-copy.copied { background: #00e5cc22; color: #fff; }
+
+    .btn-goto {
+      background: var(--rose);
+      color: #fff;
+    }
+    .btn-goto:hover { background: #ff2a5e; box-shadow: 0 0 20px var(--rose-mid); }
+    .btn-goto:active { transform: scale(0.97); }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+    /* Toast */
+    .toast {
+      position: fixed;
+      bottom: 28px;
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: var(--cyan);
+      color: #0d0d0f;
+      font-family: 'DM Mono', monospace;
+      font-size: 0.75rem;
+      font-weight: 500;
+      padding: 10px 20px;
+      border-radius: 8px;
+      opacity: 0;
+      pointer-events: none;
+      transition: all 0.25s ease;
+      z-index: 100;
+      white-space: nowrap;
+    }
+    .toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+
+    <div class="header">
+      <div class="dot"></div>
+      <h1>URL Queue</h1>
+    </div>
+
+    <!-- Tabs -->
+    <nav class="tabs">
+      <button class="tab-btn active" onclick="switchTab(0)">
+        ⌨ &nbsp;Input
+      </button>
+      <button class="tab-btn" id="queueTabBtn" onclick="switchTab(1)">
+        ⚡ &nbsp;Queue
+        <span class="badge" id="queueBadge">0</span>
+      </button>
+    </nav>
+
+    <!-- Page 1: Input -->
+    <div class="page active" id="page0">
+      <div class="input-card" id="inputCard">
+        <div class="field">
+          <label>URL</label>
+          <input type="url" id="urlInput" placeholder="https://example.com" />
+        </div>
+        <div class="field">
+          <label>Comment</label>
+          <textarea id="commentInput" rows="3" placeholder="Add a note about this URL…"></textarea>
+        </div>
+        <button class="enter-btn" id="enterBtn" onclick="addEntry()">↵ &nbsp;Add to Queue</button>
+      </div>
+
+      <div id="savedHeader" class="saved-header" style="display:none;">Queued items</div>
+      <div class="saved-list" id="savedList"></div>
+    </div>
+
+    <!-- Page 2: Queue -->
+    <div class="page" id="page1">
+      <div class="queue-area" id="queueArea">
+        <div class="empty-state" id="emptyState">
+          <div class="empty-icon">◌</div>
+          <p>No URLs in queue.<br/>Add some in the Input tab.</p>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const entries = [];
+    let queueIndex = 0;
+
+    const urlInput     = document.getElementById('urlInput');
+    const commentInput = document.getElementById('commentInput');
+    const enterBtn     = document.getElementById('enterBtn');
+    const inputCard    = document.getElementById('inputCard');
+    const savedList    = document.getElementById('savedList');
+    const savedHeader  = document.getElementById('savedHeader');
+    const queueArea    = document.getElementById('queueArea');
+    const emptyState   = document.getElementById('emptyState');
+    const queueBadge   = document.getElementById('queueBadge');
+
+    function checkReady() {
+      const ready = urlInput.value.trim() !== '' && commentInput.value.trim() !== '';
+      enterBtn.classList.toggle('visible', ready);
+      inputCard.classList.toggle('ready', ready);
+    }
+
+    urlInput.addEventListener('input', checkReady);
+    commentInput.addEventListener('input', checkReady);
+
+    function addEntry() {
+      const url     = urlInput.value.trim();
+      const comment = commentInput.value.trim();
+      if (!url || !comment) return;
+
+      entries.push({ url, comment });
+
+      // Reset inputs
+      urlInput.value     = '';
+      commentInput.value = '';
+      checkReady();
+
+      // Add to saved list on page 1
+      renderSavedList();
+      updateBadge();
+      renderQueue();
+      showToast('Added to queue ✓');
+    }
+
+    function renderSavedList() {
+      savedList.innerHTML = '';
+      savedHeader.style.display = entries.length ? 'block' : 'none';
+      entries.forEach((e, i) => {
+        const el = document.createElement('div');
+        el.className = 'saved-item';
+        el.innerHTML = `
+          <span class="item-index">${i + 1}</span>
+          <span class="item-url">${escHtml(e.url)}</span>
+          <span class="item-comment">${escHtml(e.comment)}</span>
+        `;
+        savedList.appendChild(el);
+      });
+    }
+
+    function updateBadge() {
+      const remaining = entries.length - queueIndex;
+      queueBadge.textContent = remaining;
+      queueBadge.classList.toggle('show', remaining > 0);
+    }
+
+    function renderQueue() {
+      // Remove existing card if any
+      const existing = document.getElementById('queueCard');
+      if (existing) existing.remove();
+
+      if (queueIndex >= entries.length) {
+        emptyState.style.display = 'block';
+        updateBadge();
+        return;
+      }
+
+      emptyState.style.display = 'none';
+      const entry = entries[queueIndex];
+      const remaining = entries.length - queueIndex;
+
+      const card = document.createElement('div');
+      card.className = 'queue-card';
+      card.id = 'queueCard';
+      card.innerHTML = `
+        <div class="q-counter">Item <span>${queueIndex + 1}</span> of <span>${entries.length}</span> &nbsp;·&nbsp; ${remaining} remaining</div>
+        <div class="q-url">${escHtml(entry.url)}</div>
+        <div class="q-comment-label">Comment</div>
+        <div class="q-comment">${escHtml(entry.comment)}</div>
+        <div class="q-actions">
+          <button class="btn-copy" id="copyBtn" onclick="copyComment()">
+            ⧉ &nbsp;Copy Comment
+          </button>
+          <button class="btn-goto" onclick="goToUrl()">
+            → &nbsp;Go to URL
+          </button>
+        </div>
+      `;
+      queueArea.appendChild(card);
+      updateBadge();
+    }
+
+    function normalizeUrl(raw) {
+      // Strip any non-http/https prefix (e.g. content://downloads/all_downloads/google.com)
+      // then ensure https:// is present
+      let url = raw.trim();
+      // If it already has http:// or https://, use as-is
+      if (/^https?:\/\//i.test(url)) return url;
+      // Strip anything before the actual domain (e.g. content://downloads/all_downloads/)
+      const match = url.match(/[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}.*/);
+      if (match) url = match[0];
+      return 'https://' + url;
+    }
+
+    function copyComment() {
+      const entry = entries[queueIndex];
+      if (!entry) return;
+      const text = entry.comment;
+
+      // Fallback for non-secure contexts (local file://)
+      const fallback = () => {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.cssText = 'position:fixed;opacity:0;top:0;left:0';
+        document.body.appendChild(ta);
+        ta.focus(); ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      };
+
+      const onSuccess = () => {
+        const btn = document.getElementById('copyBtn');
+        if (btn) { btn.innerHTML = '✓ &nbsp;Copied!'; btn.classList.add('copied'); }
+        setTimeout(() => {
+          const b = document.getElementById('copyBtn');
+          if (b) { b.innerHTML = '⧉ &nbsp;Copy Comment'; b.classList.remove('copied'); }
+        }, 2000);
+        showToast('Comment copied to clipboard');
+      };
+
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(onSuccess).catch(() => { fallback(); onSuccess(); });
+      } else {
+        fallback(); onSuccess();
+      }
+    }
+
+    function goToUrl() {
+      const entry = entries[queueIndex];
+      if (!entry) return;
+      window.open(normalizeUrl(entry.url), '_blank');
+
+      // Animate card out
+      const card = document.getElementById('queueCard');
+      if (card) {
+        card.style.transition = 'opacity 0.25s, transform 0.25s';
+        card.style.opacity = '0';
+        card.style.transform = 'translateX(30px)';
+        setTimeout(() => {
+          queueIndex++;
+          renderQueue();
+        }, 280);
+      } else {
+        queueIndex++;
+        renderQueue();
+      }
+    }
+
+    function switchTab(i) {
+      document.querySelectorAll('.page').forEach((p, pi) => {
+        p.classList.toggle('active', pi === i);
+      });
+      document.querySelectorAll('.tab-btn').forEach((b, bi) => {
+        b.classList.toggle('active', bi === i);
+      });
+      if (i === 1) renderQueue();
+    }
+
+    function showToast(msg) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.classList.add('show');
+      setTimeout(() => t.classList.remove('show'), 2200);
+    }
+
+    function escHtml(str) {
+      return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    // Allow Enter key to submit
+    commentInput.addEventListener('keydown', e => {
+      if (e.key === 'Enter' && !e.shiftKey && urlInput.value.trim() && commentInput.value.trim()) {
+        e.preventDefault();
+        addEntry();
+      }
+    });
+  </script>
+</body>
+</html>
