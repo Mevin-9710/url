@@ -75,28 +75,21 @@
     .q-counter { font-size: 0.65rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin-bottom: 20px; }
     .q-counter span { color: var(--rose); }
 
-    .q-url-btn {
-      display: block;
-      width: 100%;
-      background: var(--rose-dim);
-      border: 1px solid var(--rose-mid);
-      border-radius: 12px;
-      padding: 18px 48px 18px 20px;
-      text-align: left;
+    .q-url {
       font-family: 'Syne', sans-serif;
       font-size: 0.95rem;
       font-weight: 600;
-      color: var(--rose);
       word-break: break-all;
       line-height: 1.4;
-      cursor: pointer;
       margin-bottom: 20px;
-      transition: background 0.2s, box-shadow 0.2s, transform 0.15s;
-      position: relative;
     }
-    .q-url-btn:hover { background: #ff4f7b33; box-shadow: 0 0 24px var(--rose-dim); }
-    .q-url-btn:active { transform: scale(0.98); }
-    .q-url-btn .arrow { position: absolute; top: 18px; right: 18px; font-size: 1.1rem; opacity: 0.6; }
+    .q-url a {
+      color: var(--rose);
+      text-decoration: none;
+      border-bottom: 1px solid var(--rose-mid);
+      transition: border-color 0.2s, color 0.2s;
+    }
+    .q-url a:hover { color: #ff2a5e; border-color: var(--rose); }
 
     .q-comment-label { font-size: 0.62rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
     .q-comment { font-size: 0.85rem; color: var(--text); line-height: 1.6; padding: 12px 14px; background: var(--surface); border-radius: 8px; border-left: 2px solid var(--rose-mid); margin-bottom: 28px; }
@@ -173,10 +166,11 @@
     card.id = 'queueCard';
     card.innerHTML = `
       <div class="q-counter">Item <span>${queueIndex + 1}</span> of <span>${entries.length}</span> &nbsp;·&nbsp; ${remaining} remaining</div>
-      <button class="q-url-btn" onclick="goToUrl()">
-        ${escHtml(entry.url)}
-        <span class="arrow">↗</span>
-      </button>
+      <div class="q-url">
+        <a href="${escHtml(normalizeUrl(entry.url))}" target="_blank" onclick="advanceQueue()">
+          ${escHtml(entry.url)}
+        </a>
+      </div>
       <div class="q-comment-label">Comment</div>
       <div class="q-comment">${escHtml(entry.comment)}</div>
       <div class="q-actions">
@@ -211,13 +205,6 @@
       save();
       renderQueue();
     }
-  }
-
-  function goToUrl() {
-    const entry = entries[queueIndex];
-    if (!entry) return;
-    window.open(normalizeUrl(entry.url), '_blank');
-    advanceQueue();
   }
 
   function skipUrl() {
