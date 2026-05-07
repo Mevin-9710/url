@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>URL Queue — Queue</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;600;800&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0d0d0f;
+      --surface: #141416;
+      --card: #1a1a1e;
+      --border: #2a2a30;
+      --rose: #ff4f7b;
+      --rose-dim: #ff4f7b22;
+      --rose-mid: #ff4f7b66;
+      --cyan: #00e5cc;
+      --cyan-dim: #00e5cc18;
+      --text: #f0eff4;
+      --muted: #6b6a75;
+    }
+    html, body { height: 100%; background: var(--bg); color: var(--text); font-family: 'DM Mono', monospace; overflow: hidden; }
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: linear-gradient(rgba(255,79,123,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,79,123,0.03) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+      z-index: 0;
+    }
+    .shell {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      max-width: 780px;
+      margin: 0 auto;
+      padding: 24px 20px 20px;
+    }
+    .header { display: flex; align-items: center; gap: 14px; margin-bottom: 28px; }
+    .header h1 { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 1.5rem; letter-spacing: -0.02em; color: var(--text); }
+    .header .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--rose); box-shadow: 0 0 10px var(--rose); flex-shrink: 0; animation: pulse 2s ease-in-out infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.5; transform: scale(0.7); } }
+
+    .nav-link {
+      margin-left: auto;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--muted);
+      font-family: 'DM Mono', monospace;
+      font-size: 0.72rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 8px 14px;
+      text-decoration: none;
+      transition: all 0.2s;
+    }
+    .nav-link:hover { border-color: var(--rose-mid); color: var(--rose); }
+
+    .queue-area { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+    .empty-state { text-align: center; color: var(--muted); }
+    .empty-state .empty-icon { font-size: 2.5rem; margin-bottom: 12px; opacity: 0.3; }
+    .empty-state p { font-size: 0.8rem; line-height: 1.6; }
+    .empty-state a { color: var(--rose); text-decoration: none; }
+    .empty-state a:hover { text-decoration: underline; }
+
+    .queue-card { width: 100%; background: var(--card); border: 1px solid var(--border); border-radius: 18px; padding: 32px; position: relative; overflow: hidden; animation: cardIn 0.4s cubic-bezier(0.22, 1, 0.36, 1); }
+    @keyframes cardIn { from { opacity: 0; transform: translateY(20px) scale(0.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
+    .queue-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, var(--rose), var(--cyan)); }
+
+    .q-counter { font-size: 0.65rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin-bottom: 20px; }
+    .q-counter span { color: var(--rose); }
+
+    .q-url-btn {
+      display: block;
+      width: 100%;
+      background: var(--rose-dim);
+      border: 1px solid var(--rose-mid);
+      border-radius: 12px;
+      padding: 18px 48px 18px 20px;
+      text-align: left;
+      font-family: 'Syne', sans-serif;
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--rose);
+      word-break: break-all;
+      line-height: 1.4;
+      cursor: pointer;
+      margin-bottom: 20px;
+      transition: background 0.2s, box-shadow 0.2s, transform 0.15s;
+      position: relative;
+    }
+    .q-url-btn:hover { background: #ff4f7b33; box-shadow: 0 0 24px var(--rose-dim); }
+    .q-url-btn:active { transform: scale(0.98); }
+    .q-url-btn .arrow { position: absolute; top: 18px; right: 18px; font-size: 1.1rem; opacity: 0.6; }
+
+    .q-comment-label { font-size: 0.62rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+    .q-comment { font-size: 0.85rem; color: var(--text); line-height: 1.6; padding: 12px 14px; background: var(--surface); border-radius: 8px; border-left: 2px solid var(--rose-mid); margin-bottom: 28px; }
+
+    .q-actions { display: flex; gap: 12px; }
+    .btn-copy, .btn-skip { flex: 1; padding: 13px; border-radius: 8px; font-family: 'DM Mono', monospace; font-size: 0.75rem; font-weight: 500; letter-spacing: 0.05em; cursor: pointer; border: none; display: flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.2s ease; }
+    .btn-copy { background: var(--cyan-dim); color: var(--cyan); border: 1px solid #00e5cc44; }
+    .btn-copy:hover { background: #00e5cc28; box-shadow: 0 0 16px #00e5cc22; }
+    .btn-copy.copied { background: #00e5cc22; color: #fff; }
+    .btn-skip { background: var(--surface); color: var(--muted); border: 1px solid var(--border); }
+    .btn-skip:hover { border-color: var(--rose-mid); color: var(--rose); }
+
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+    .toast { position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--cyan); color: #0d0d0f; font-family: 'DM Mono', monospace; font-size: 0.75rem; font-weight: 500; padding: 10px 20px; border-radius: 8px; opacity: 0; pointer-events: none; transition: all 0.25s ease; z-index: 100; white-space: nowrap; }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  </style>
+</head>
+<body>
+<div class="shell">
+  <div class="header">
+    <div class="dot"></div>
+    <h1>Queue</h1>
+    <a class="nav-link" href="url.html">⌨ &nbsp;Input</a>
+  </div>
+
+  <div class="queue-area" id="queueArea">
+    <div class="empty-state" id="emptyState">
+      <div class="empty-icon">◌</div>
+      <p>No URLs in queue.<br/><a href="url.html">Add some in the Input page →</a></p>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  const STORAGE_KEY = 'urlqueue_v1';
+
+  function load() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return { entries: [], queueIndex: 0 };
+      return JSON.parse(raw);
+    } catch { return { entries: [], queueIndex: 0 }; }
+  }
+
+  function save() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ entries, queueIndex }));
+  }
+
+  let { entries, queueIndex } = load();
+
+  const queueArea  = document.getElementById('queueArea');
+  const emptyState = document.getElementById('emptyState');
+
+  function renderQueue() {
+    const existing = document.getElementById('queueCard');
+    if (existing) existing.remove();
+
+    if (queueIndex >= entries.length) {
+      emptyState.style.display = 'block';
+      return;
+    }
+
+    emptyState.style.display = 'none';
+    const entry = entries[queueIndex];
+    const remaining = entries.length - queueIndex;
+
+    const card = document.createElement('div');
+    card.className = 'queue-card';
+    card.id = 'queueCard';
+    card.innerHTML = `
+      <div class="q-counter">Item <span>${queueIndex + 1}</span> of <span>${entries.length}</span> &nbsp;·&nbsp; ${remaining} remaining</div>
+      <button class="q-url-btn" onclick="goToUrl()">
+        ${escHtml(entry.url)}
+        <span class="arrow">↗</span>
+      </button>
+      <div class="q-comment-label">Comment</div>
+      <div class="q-comment">${escHtml(entry.comment)}</div>
+      <div class="q-actions">
+        <button class="btn-copy" id="copyBtn" onclick="copyComment()">⧉ &nbsp;Copy Comment</button>
+        <button class="btn-skip" onclick="skipUrl()">↷ &nbsp;Skip</button>
+      </div>
+    `;
+    queueArea.appendChild(card);
+  }
+
+  function normalizeUrl(raw) {
+    let url = raw.trim();
+    if (/^https?:\/\//i.test(url)) return url;
+    const match = url.match(/[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}.*/);
+    if (match) url = match[0];
+    return 'https://' + url;
+  }
+
+  function advanceQueue() {
+    const card = document.getElementById('queueCard');
+    if (card) {
+      card.style.transition = 'opacity 0.22s, transform 0.22s';
+      card.style.opacity = '0';
+      card.style.transform = 'translateX(30px)';
+      setTimeout(() => {
+        queueIndex++;
+        save();
+        renderQueue();
+      }, 240);
+    } else {
+      queueIndex++;
+      save();
+      renderQueue();
+    }
+  }
+
+  function goToUrl() {
+    const entry = entries[queueIndex];
+    if (!entry) return;
+    window.open(normalizeUrl(entry.url), '_blank');
+    advanceQueue();
+  }
+
+  function skipUrl() {
+    advanceQueue();
+    showToast('Skipped');
+  }
+
+  function copyComment() {
+    const entry = entries[queueIndex];
+    if (!entry) return;
+    const text = entry.comment;
+    const fallback = () => {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.cssText = 'position:fixed;opacity:0;top:0;left:0';
+      document.body.appendChild(ta);
+      ta.focus(); ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+    };
+    const onSuccess = () => {
+      const btn = document.getElementById('copyBtn');
+      if (btn) { btn.innerHTML = '✓ &nbsp;Copied!'; btn.classList.add('copied'); }
+      setTimeout(() => {
+        const b = document.getElementById('copyBtn');
+        if (b) { b.innerHTML = '⧉ &nbsp;Copy Comment'; b.classList.remove('copied'); }
+      }, 2000);
+      showToast('Comment copied to clipboard');
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(onSuccess).catch(() => { fallback(); onSuccess(); });
+    } else { fallback(); onSuccess(); }
+  }
+
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 2200);
+  }
+
+  function escHtml(str) {
+    return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  // Re-render if url.html adds new entries while this tab is open
+  window.addEventListener('storage', () => {
+    const data = load();
+    entries = data.entries;
+    queueIndex = data.queueIndex;
+    renderQueue();
+  });
+
+  renderQueue();
+</script>
+</body>
+</html>
